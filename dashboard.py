@@ -1296,55 +1296,166 @@ def page_paper():
 
     st.divider()
 
+    # 종목 추천
+    st.subheader("🎯 지금 뭘 사면 좋을까?")
+    st.markdown('<p class="help-text">AI가 분석한 점수가 높은 종목을 보여줘요. 점수가 높을수록 매수 추천!</p>', unsafe_allow_html=True)
+
+    rec_market = st.radio("시장", ["미국 추천 종목", "한국 추천 종목"], horizontal=True, key="rec_market")
+
+    if st.button("추천 종목 분석하기", use_container_width=True, key="rec_scan"):
+        with st.spinner("종목 분석 중... (30초~1분 소요)"):
+            from src.engine.scanner import scan_us_stocks, scan_korea_stocks
+            if "미국" in rec_market:
+                scan_results = scan_us_stocks()
+            else:
+                scan_results = scan_korea_stocks()
+
+        if scan_results:
+            st.session_state["rec_results"] = scan_results
+
+    if "rec_results" in st.session_state and st.session_state["rec_results"]:
+        scan_results = st.session_state["rec_results"]
+        buy_candidates = [r for r in scan_results if r.get("signal") in ("강력 매수", "매수")]
+        hold_list = [r for r in scan_results if r.get("signal") == "관망"]
+        sell_list = [r for r in scan_results if r.get("signal") in ("매도", "강력 매도")]
+
+        if buy_candidates:
+            st.markdown("#### 📈 매수 추천")
+            for r in buy_candidates[:5]:
+                score = r.get("final_score", 0)
+                signal = SIGNAL_FRIENDLY.get(r.get("signal", ""), r.get("signal", ""))
+                ticker = r.get("ticker", "")
+                name = r.get("name", ticker)
+                price = r.get("price", 0)
+                is_kr = r.get("market") == "KR" or (isinstance(ticker, str) and ticker.isdigit())
+                price_str = f"{price:,.0f}원" if is_kr else f"${price:,.2f}"
+                market = "KR" if is_kr else "US"
+
+                with st.container():
+                    c1, c2, c3 = st.columns([3, 1, 1])
+                    with c1:
+                        st.markdown(f"**{name}** ({ticker})")
+                        st.caption(f"{signal} · 점수 {score:+.1f} · 현재가 {price_str}")
+                    with c2:
+                        buy_shares = st.number_input("수량", min_value=1, value=5, key=f"rec_qty_{ticker}")
+                    with c3:
+                        st.markdown("")
+                        if st.button("매수", key=f"rec_buy_{ticker}", type="primary", use_container_width=True):
+                            msg = port.buy(ticker, name, market, buy_shares, price,
+                                           reason=f"추천 매수 ({signal})", signal_score=score)
+                            st.success(msg)
+                            st.rerun()
+
+        if hold_list:
+            with st.expander(f"관망 ({len(hold_list)}종목)"):
+                for r in hold_list:
+                    st.caption(f"{r.get('name', '')} ({r.get('ticker', '')}) — 점수 {r.get('final_score', 0):+.1f}")
+
+        if sell_list:
+            st.markdown("#### 📉 매도 추천")
+            for r in sell_list:
+                pos = port.get_position(r.get("ticker", ""))
+                if pos:
+                    st.warning(f"**{r.get('name', '')}** ({r.get('ticker', '')}) — 보유 중인데 매도 시그널이에요!")
+
+    st.divider()
+
     # 매수/매도
     st.subheader("직접 사고팔기")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        trade_ticker = st.text_input("종목 코드", "", placeholder="예: AAPL, 005930",
-                                     key="paper_ticker").strip().upper()
-    with col2:
-        trade_shares = st.number_input("수량", min_value=1, value=10, key="paper_shares")
-    with col3:
-        trade_action = st.radio("매매", ["매수 (사기)", "매도 (팔기)"], horizontal=True, key="paper_action")
-    with col4:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("실행", type="primary", key="paper_exec", use_container_width=True):
-            if trade_ticker:
-                is_korea = trade_ticker.isdigit() and len(trade_ticker) == 6
-                market = "KR" if is_korea else "US"
+    st.markdown('<p class="help-text">원하는 종목을 자유롭게 매수/매도할 수 있어요</p>', unsafe_allow_html=True)
 
+    trade_method = st.radio(
+        "종목 선택",
+        ["주요 종목에서 고르기", "보유 종목 매도", "직접 검색"],
+        horizontal=True, key="trade_method",
+    )
+
+    from src.config import US_TOP, KOREA_TOP
+
+    trade_ticker = ""
+    trade_name = ""
+    trade_market = "US"
+
+    if trade_method == "주요 종목에서 고르기":
+        market_choice = st.radio("시장", ["미국", "한국"], horizontal=True, key="trade_market_choice")
+        if market_choice == "미국":
+            stock_map = {f"{name} ({ticker})": (ticker, name) for name, ticker in US_TOP.items()}
+        else:
+            stock_map = {f"{name} ({code})": (code, name) for name, code in KOREA_TOP.items()}
+        selected = st.selectbox("종목 선택", list(stock_map.keys()), key="trade_select")
+        trade_ticker, trade_name = stock_map[selected]
+        trade_market = "KR" if market_choice == "한국" else "US"
+
+    elif trade_method == "보유 종목 매도":
+        if port.positions:
+            pos_map = {f"{p.name} ({p.ticker})": p for p in port.positions}
+            selected_pos = st.selectbox("매도할 종목", list(pos_map.keys()), key="sell_select")
+            pos = pos_map[selected_pos]
+            trade_ticker = pos.ticker
+            trade_name = pos.name
+            trade_market = pos.market
+            st.caption(f"보유: {pos.shares}주 · 평균 단가: {'$' if pos.market == 'US' else ''}{pos.entry_price:,.2f}{'원' if pos.market == 'KR' else ''}")
+        else:
+            st.info("보유 종목이 없어요.")
+
+    else:
+        trade_ticker = st.text_input("종목 코드 입력", "", placeholder="AAPL, TSLA, 005930 등",
+                                     key="paper_ticker").strip().upper()
+        if trade_ticker:
+            is_korea = trade_ticker.isdigit() and len(trade_ticker) == 6
+            trade_market = "KR" if is_korea else "US"
+            if is_korea:
+                trade_name = {v: k for k, v in KOREA_TOP.items()}.get(trade_ticker, trade_ticker)
+            else:
+                trade_name = {v: k for k, v in US_TOP.items()}.get(trade_ticker, trade_ticker)
+
+    if trade_ticker:
+        col_qty, col_action, col_exec = st.columns([1, 1, 1])
+        with col_qty:
+            trade_shares = st.number_input("수량", min_value=1, value=10, key="paper_shares")
+        with col_action:
+            if trade_method == "보유 종목 매도":
+                trade_action = "매도 (팔기)"
+                st.markdown(f"**매도**")
+            else:
+                trade_action = st.radio("매매", ["매수 (사기)", "매도 (팔기)"], horizontal=True, key="paper_action")
+        with col_exec:
+            st.markdown("")
+            if st.button("실행", type="primary", key="paper_exec", use_container_width=True):
                 try:
-                    if is_korea:
+                    if trade_market == "KR":
                         from src.data.korea import fetch_korea_stock
                         df = fetch_korea_stock(trade_ticker, days=5)
-                        from src.config import KOREA_TOP
-                        name = {v: k for k, v in KOREA_TOP.items()}.get(trade_ticker, trade_ticker)
                     else:
                         from src.data.us import fetch_us_stock
                         df = fetch_us_stock(trade_ticker, period="5d")
-                        from src.config import US_TOP
-                        name = {v: k for k, v in US_TOP.items()}.get(trade_ticker, trade_ticker)
+
+                    if not trade_name or trade_name == trade_ticker:
+                        try:
+                            import yfinance as yf
+                            info = yf.Ticker(trade_ticker).info
+                            trade_name = info.get("shortName", trade_ticker)
+                        except Exception:
+                            trade_name = trade_ticker
 
                     if df.empty:
-                        st.error("종목 데이터를 가져올 수 없어요.")
+                        st.error("종목 데이터를 가져올 수 없어요. 코드를 확인해주세요.")
                     else:
                         price = float(df["Close"].iloc[-1])
                         if "매수" in trade_action:
-                            msg = port.buy(trade_ticker, name, market, trade_shares, price, reason="대시보드 매수")
+                            msg = port.buy(trade_ticker, trade_name, trade_market, trade_shares, price, reason="수동 매수")
                             st.success(msg)
                         else:
-                            msg = port.sell(trade_ticker, trade_shares, price, reason="대시보드 매도")
+                            msg = port.sell(trade_ticker, trade_shares, price, reason="수동 매도")
                             st.success(msg)
                         st.rerun()
                 except Exception as e:
                     st.error(f"오류: {e}")
-            else:
-                st.warning("종목 코드를 입력해주세요.")
 
     st.divider()
 
     # 자동 매매
-    st.subheader("알고리즘 자동 매매")
+    st.subheader("🤖 알고리즘 자동 매매")
     st.markdown('<p class="help-text">분석 점수가 높은 종목은 자동 매수, 낮은 종목은 자동 매도해요 (2~3분 소요)</p>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
