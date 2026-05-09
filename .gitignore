@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+paper_portfolio.json
+cache/
+.DS_Store
