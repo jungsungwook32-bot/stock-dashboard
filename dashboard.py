@@ -18,25 +18,148 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ─── 다크 테마 CSS ───
+# ─── 토스 스타일 다크 테마 CSS ───
 st.markdown("""
 <style>
-    .stMetric .metric-container { background: #1e1e2e; border-radius: 8px; padding: 12px; }
-    div[data-testid="stMetricValue"] { font-size: 1.8rem; }
-    .regime-card {
-        padding: 20px; border-radius: 12px; text-align: center;
-        font-size: 1.5rem; font-weight: bold; margin-bottom: 16px;
+    /* ── 전체 배경 & 기본 ── */
+    .stApp { background-color: #0D0D0D; }
+    section[data-testid="stSidebar"] {
+        background-color: #111111;
+        border-right: 1px solid rgba(255,255,255,0.04);
     }
-    .regime-desc { font-size: 0.9rem; font-weight: normal; margin-top: 4px; }
-    .regime-tip { font-size: 0.8rem; font-weight: normal; margin-top: 8px; opacity: 0.85; }
-    .score-strong-buy { color: #00e676; }
-    .score-buy { color: #66bb6a; }
-    .score-hold { color: #ffa726; }
-    .score-sell { color: #ef5350; }
-    .score-strong-sell { color: #d50000; }
-    .help-text { font-size: 0.82rem; color: #9e9e9e; margin-top: -8px; margin-bottom: 12px; }
+    section[data-testid="stSidebar"] .stRadio label {
+        padding: 10px 16px; border-radius: 12px; margin-bottom: 2px;
+        transition: background 0.2s;
+    }
+    section[data-testid="stSidebar"] .stRadio label:hover {
+        background: rgba(49,130,246,0.08);
+    }
+    section[data-testid="stSidebar"] .stRadio label[data-checked="true"],
+    section[data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:has(input:checked) {
+        background: rgba(49,130,246,0.15); color: #3182F6;
+    }
+
+    /* ── 카드형 메트릭 ── */
+    div[data-testid="stMetric"] {
+        background: #1A1A1A; border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 16px; padding: 20px 24px;
+    }
+    div[data-testid="stMetricLabel"] { font-size: 0.85rem; color: #8E8E93; font-weight: 500; }
+    div[data-testid="stMetricValue"] { font-size: 1.6rem; font-weight: 700; color: #FFFFFF; }
+    div[data-testid="stMetricDelta"] svg { display: none; }
+    div[data-testid="stMetricDelta"] > div { font-size: 0.9rem; font-weight: 600; }
+
+    /* ── 카드형 컨테이너 ── */
+    div[data-testid="stExpander"] {
+        background: #1A1A1A; border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 16px; overflow: hidden;
+    }
+    div[data-testid="stExpander"] summary {
+        padding: 16px 20px; font-weight: 600; color: #F5F5F5;
+    }
+    div[data-testid="stExpander"] > div[role="region"] {
+        padding: 0 20px 16px;
+    }
+
+    /* ── 탭 스타일 ── */
+    button[data-baseweb="tab"] {
+        font-weight: 600; border-radius: 12px; padding: 8px 20px;
+        color: #8E8E93;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #3182F6; background: rgba(49,130,246,0.1);
+    }
+    div[data-baseweb="tab-highlight"] { background-color: #3182F6; }
+
+    /* ── 버튼 ── */
+    .stButton > button {
+        background: #3182F6; color: white; border: none;
+        border-radius: 12px; padding: 10px 24px; font-weight: 600;
+        transition: all 0.2s;
+    }
+    .stButton > button:hover { background: #1B6CF2; transform: translateY(-1px); }
+    .stButton > button:active { transform: translateY(0); }
+
+    /* ── 데이터프레임 / 테이블 ── */
+    div[data-testid="stDataFrame"] {
+        border-radius: 16px; overflow: hidden;
+        border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    /* ── 알림 카드 ── */
+    div[data-testid="stAlert"] {
+        border-radius: 12px; border: none;
+        padding: 16px 20px;
+    }
+
+    /* ── 셀렉트박스 / 인풋 ── */
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="input"] > div {
+        background: #1A1A1A; border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 12px;
+    }
+
+    /* ── 구분선 ── */
+    hr { border-color: rgba(255,255,255,0.06); }
+
+    /* ── 스크롤바 ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+    /* ── 커스텀 클래스 ── */
+    .regime-card {
+        background: linear-gradient(135deg, #1A1A2E 0%, #16213E 100%);
+        padding: 24px; border-radius: 20px; text-align: center;
+        font-size: 1.4rem; font-weight: 700; margin-bottom: 16px;
+        border: 1px solid rgba(49,130,246,0.15);
+    }
+    .regime-desc { font-size: 0.9rem; font-weight: 400; color: #B0B0B0; margin-top: 6px; }
+    .regime-tip { font-size: 0.8rem; font-weight: 400; margin-top: 8px; opacity: 0.75; }
+
+    .score-strong-buy { color: #34C759; }
+    .score-buy { color: #30D158; }
+    .score-hold { color: #FFD60A; }
+    .score-sell { color: #FF6B6B; }
+    .score-strong-sell { color: #FF3B30; }
+
+    .help-text { font-size: 0.82rem; color: #636366; margin-top: -8px; margin-bottom: 14px; }
+
+    /* ── 타이틀 ── */
+    h1 { font-weight: 800 !important; letter-spacing: -0.5px; }
+    h2, h3 { font-weight: 700 !important; color: #F5F5F5; }
+
+    /* ── 모바일 최적화 ── */
+    @media (max-width: 768px) {
+        div[data-testid="stMetric"] { padding: 14px 16px; }
+        div[data-testid="stMetricValue"] { font-size: 1.3rem; }
+        .regime-card { font-size: 1.1rem; padding: 18px; }
+        h1 { font-size: 1.5rem !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
+
+CHART_LAYOUT = dict(
+    template="plotly_dark",
+    paper_bgcolor="#0D0D0D",
+    plot_bgcolor="#0D0D0D",
+    font=dict(family="sans-serif", color="#F5F5F5"),
+    xaxis=dict(gridcolor="rgba(255,255,255,0.04)", zerolinecolor="rgba(255,255,255,0.06)"),
+    yaxis=dict(gridcolor="rgba(255,255,255,0.04)", zerolinecolor="rgba(255,255,255,0.06)"),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, font=dict(size=11)),
+    margin=dict(l=10, r=10, t=40, b=10),
+    colorway=["#3182F6", "#34C759", "#FF6B6B", "#FFD60A", "#BF5AF2", "#FF9F0A", "#64D2FF", "#30D158"],
+)
+
+CHART_COLORS = {
+    "blue": "#3182F6",
+    "green": "#34C759",
+    "red": "#FF3B30",
+    "yellow": "#FFD60A",
+    "purple": "#BF5AF2",
+    "orange": "#FF9F0A",
+    "cyan": "#64D2FF",
+}
 
 
 # ─── 초보자용 용어 변환 ───
@@ -1505,18 +1628,12 @@ def page_global_tracker():
                     if hasattr(close, "columns"):
                         close = close.iloc[:, 0]
                     normalized = (close / close.iloc[0] - 1) * 100
-                    fig.update_layout(
-                        template="plotly_dark",
-                        height=400,
-                        yaxis_title="변동률 (%)",
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02),
-                        margin=dict(l=0, r=0, t=30, b=0),
-                    )
+                    fig.update_layout(**CHART_LAYOUT, height=400, yaxis_title="변동률 (%)")
                     fig.add_trace(go.Scatter(
                         x=df.index, y=normalized,
                         name=label, mode="lines",
                     ))
-                fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
+                fig.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.1)", opacity=0.5)
                 st.plotly_chart(fig, use_container_width=True)
 
                 st.markdown("**현재 가격 & 변동:**")
@@ -1566,15 +1683,8 @@ def page_global_tracker():
                 x=df.index, y=normalized,
                 name=info["name"], mode="lines",
             ))
-        fig_energy.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-        fig_energy.update_layout(
-            template="plotly_dark",
-            height=350,
-            yaxis_title="변동률 (%)",
-            title="에너지 가격 추이 (6개월)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02),
-            margin=dict(l=0, r=0, t=40, b=0),
-        )
+        fig_energy.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.1)", opacity=0.5)
+        fig_energy.update_layout(**CHART_LAYOUT, height=350, yaxis_title="변동률 (%)", title="에너지 가격 추이 (6개월)")
         st.plotly_chart(fig_energy, use_container_width=True)
 
         with st.expander("에너지 가격이 내 투자에 미치는 영향"):
@@ -1616,15 +1726,8 @@ def page_global_tracker():
                 x=df.index, y=normalized,
                 name=label, mode="lines",
             ))
-        fig_geo.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.5)
-        fig_geo.update_layout(
-            template="plotly_dark",
-            height=350,
-            yaxis_title="변동률 (%)",
-            title="지정학 리스크 관련 자산 (3개월)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02),
-            margin=dict(l=0, r=0, t=40, b=0),
-        )
+        fig_geo.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.1)", opacity=0.5)
+        fig_geo.update_layout(**CHART_LAYOUT, height=350, yaxis_title="변동률 (%)", title="지정학 리스크 관련 자산 (3개월)")
         st.plotly_chart(fig_geo, use_container_width=True)
 
         all_rising = True
@@ -1654,14 +1757,15 @@ PAGES = {
 }
 
 with st.sidebar:
-    st.title("내 투자 도우미")
-    st.caption("여러 기준으로 종목을 분석해요")
-    st.divider()
+    st.markdown("## 💎 투자 도우미")
+    st.caption("나만의 투자 분석 앱")
+    st.markdown("")
     page = st.radio("메뉴", list(PAGES.keys()), label_visibility="collapsed")
-    st.divider()
-    st.caption("무료 데이터 사용: Yahoo · KRX · FRED")
-    if st.button("🔄 새로고침"):
+    st.markdown("")
+    st.markdown("")
+    if st.button("🔄 새로고침", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+    st.caption("무료 데이터 · Yahoo · KRX · FRED")
 
 PAGES[page]()
